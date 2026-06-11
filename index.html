@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ติดตามการชำระหนี้</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f0f10; --surface: #1a1a1c; --surface2: #242426; --border: #2e2e32;
+    --accent: #4ade80; --accent-dim: rgba(74,222,128,0.12);
+    --danger: #f87171; --danger-dim: rgba(248,113,113,0.12);
+    --text: #e8e8ea; --text-dim: #7a7a82; --text-mid: #b0b0b8;
+    --radius: 14px; --radius-sm: 8px;
+  }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'IBM Plex Sans Thai', sans-serif;
+    min-height: 100vh; padding: 24px 16px 48px;
+    max-width: 480px; margin: 0 auto;
+  }
+
+  /* Header */
+  .header { margin-bottom: 28px; }
+  .label-sm { font-size: 11px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 6px; }
+  h1 { font-size: 26px; font-weight: 600; line-height: 1.2; }
+
+  /* Progress card */
+  .progress-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 16px; }
+  .big-numbers { display: flex; align-items: baseline; gap: 6px; margin-bottom: 18px; }
+  .paid-amount { font-family: 'IBM Plex Mono', monospace; font-size: 38px; font-weight: 500; color: var(--accent); line-height: 1; }
+  .total-amount { font-family: 'IBM Plex Mono', monospace; font-size: 20px; color: var(--text-dim); }
+  .currency { font-size: 14px; color: var(--text-dim); margin-left: 2px; }
+  .progress-bar-wrap { background: var(--surface2); border-radius: 100px; height: 8px; overflow: hidden; margin-bottom: 14px; }
+  .progress-bar-fill { height: 100%; background: var(--accent); border-radius: 100px; transition: width 0.6s cubic-bezier(0.4,0,0.2,1); }
+  .stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .stat { background: var(--surface2); border-radius: var(--radius-sm); padding: 12px 10px; text-align: center; }
+  .stat-value { font-family: 'IBM Plex Mono', monospace; font-size: 15px; font-weight: 500; color: var(--text); display: block; margin-bottom: 4px; }
+  .stat-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; }
+
+  /* Messenger message box */
+  .copy-hint { margin-bottom: 16px; padding: 12px 14px; background: var(--surface2); border-radius: var(--radius-sm); font-size: 12px; color: var(--text-dim); line-height: 1.7; display: none; }
+  .copy-hint-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .copy-hint strong { font-size: 11px; color: var(--text-mid); text-transform: uppercase; letter-spacing: 0.06em; }
+  .btn-copy { background: var(--surface); border: 1px solid var(--border); border-radius: 100px; color: var(--text-mid); font-size: 11px; padding: 3px 10px; cursor: pointer; transition: border-color 0.15s, color 0.15s; }
+  .btn-copy:hover { border-color: var(--accent); color: var(--accent); }
+  #copyText { white-space: pre-line; }
+
+  /* Section title */
+  .section-title { font-size: 13px; font-weight: 500; color: var(--text-dim); margin-bottom: 10px; letter-spacing: 0.04em; }
+
+  /* Slip upload */
+  .slip-zone {
+    border: 1.5px dashed var(--border); border-radius: var(--radius-sm);
+    padding: 20px 14px; text-align: center; cursor: pointer; margin-bottom: 14px;
+    transition: border-color 0.2s, background 0.2s; position: relative;
+  }
+  .slip-zone:hover, .slip-zone.drag-over { border-color: var(--accent); background: var(--accent-dim); }
+  .slip-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .slip-zone-icon { font-size: 22px; margin-bottom: 6px; }
+  .slip-zone-text { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+  .slip-zone-text strong { color: var(--text-mid); }
+
+  .slip-preview { display: none; position: relative; margin-bottom: 14px; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--border); }
+  .slip-preview img { width: 100%; max-height: 200px; object-fit: contain; background: var(--surface2); display: block; }
+  .slip-preview-remove { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.65); border: none; color: #fff; border-radius: 100px; font-size: 12px; padding: 4px 10px; cursor: pointer; }
+
+  .ai-reading { display: none; align-items: center; gap: 10px; background: var(--surface2); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 14px; font-size: 13px; color: var(--text-mid); }
+  .spinner { width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+  /* Amount input */
+  .input-row { display: flex; gap: 10px; margin-bottom: 10px; }
+  .input-wrap { flex: 1; position: relative; }
+  input[type="number"] {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text);
+    font-family: 'IBM Plex Mono', monospace; font-size: 17px;
+    padding: 13px 48px 13px 14px; outline: none; transition: border-color 0.2s;
+    -moz-appearance: textfield;
+  }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+  input[type="number"]:focus { border-color: var(--accent); }
+  .input-suffix { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 12px; color: var(--text-dim); }
+
+  /* Month/Year selects */
+  .month-row { display: flex; gap: 8px; margin-bottom: 14px; }
+  .month-row select {
+    flex: 1; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text);
+    font-family: 'IBM Plex Sans Thai', sans-serif; font-size: 14px;
+    padding: 10px 28px 10px 12px; outline: none; cursor: pointer; transition: border-color 0.2s;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237a7a82' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center;
+  }
+  .month-row select:focus { border-color: var(--accent); }
+
+  .btn-pay { background: var(--accent); color: #0a1a0f; border: none; border-radius: var(--radius-sm); font-family: 'IBM Plex Sans Thai', sans-serif; font-size: 15px; font-weight: 600; padding: 13px 20px; cursor: pointer; white-space: nowrap; transition: opacity 0.15s, transform 0.1s; }
+  .btn-pay:hover { opacity: 0.88; }
+  .btn-pay:active { transform: scale(0.97); }
+
+  .quick-row { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+  .btn-quick { background: var(--surface2); border: 1px solid var(--border); border-radius: 100px; color: var(--text-mid); font-family: 'IBM Plex Mono', monospace; font-size: 13px; padding: 6px 14px; cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s; }
+  .btn-quick:hover { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+  /* History */
+  .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .btn-clear { background: none; border: none; color: var(--danger); font-size: 12px; cursor: pointer; padding: 4px 0; font-family: 'IBM Plex Sans Thai', sans-serif; opacity: 0.7; transition: opacity 0.15s; }
+  .btn-clear:hover { opacity: 1; }
+  .history-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .history-item { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 8px; animation: slideIn 0.25s ease; }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+
+  .history-left { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+  .history-index { font-size: 10px; color: var(--text-dim); font-family: 'IBM Plex Mono', monospace; min-width: 20px; flex-shrink: 0; }
+  .history-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .history-amount { font-family: 'IBM Plex Mono', monospace; font-size: 15px; font-weight: 500; color: var(--accent); }
+  .history-date { font-size: 11px; color: var(--text-dim); }
+  .history-month-badge { display: inline-block; font-size: 10px; color: var(--accent); background: var(--accent-dim); border-radius: 100px; padding: 2px 7px; margin-top: 2px; width: fit-content; }
+
+  .history-right { text-align: right; flex-shrink: 0; }
+  .history-running { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--text-mid); }
+  .history-remaining { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+
+  .btn-delete { background: none; border: 1px solid transparent; color: var(--text-dim); border-radius: var(--radius-sm); font-size: 13px; padding: 5px 7px; cursor: pointer; flex-shrink: 0; transition: color 0.15s, border-color 0.15s, background 0.15s; line-height: 1; }
+  .btn-delete:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-dim); }
+
+  .empty-state { text-align: center; padding: 32px 0; color: var(--text-dim); font-size: 14px; line-height: 1.7; }
+
+  .complete-banner { background: var(--accent-dim); border: 1px solid var(--accent); border-radius: var(--radius-sm); padding: 14px 16px; text-align: center; font-size: 15px; font-weight: 500; color: var(--accent); margin-bottom: 16px; display: none; }
+
+  .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--accent); color: #0a1a0f; padding: 10px 20px; border-radius: 100px; font-size: 13px; font-weight: 600; opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; white-space: nowrap; z-index: 999; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <p class="label-sm">debt tracker</p>
+  <h1>ติดตามการชำระหนี้</h1>
+</div>
+
+<div class="complete-banner" id="completeBanner">🎉 ชำระหนี้ครบแล้ว! ยินดีด้วยครับ</div>
+
+<div class="progress-card">
+  <div class="big-numbers">
+    <span class="paid-amount" id="paidDisplay">0</span>
+    <span class="total-amount">/ <span id="totalDisplay">200,000</span></span>
+    <span class="currency">บาท</span>
+  </div>
+  <div class="progress-bar-wrap">
+    <div class="progress-bar-fill" id="progressBar" style="width:0%"></div>
+  </div>
+  <div class="stats-row">
+    <div class="stat"><span class="stat-value" id="statPercent">0%</span><span class="stat-label">จ่ายแล้ว</span></div>
+    <div class="stat"><span class="stat-value" id="statRemaining">200,000</span><span class="stat-label">คงเหลือ (฿)</span></div>
+    <div class="stat"><span class="stat-value" id="statMonths">-</span><span class="stat-label">เดือนที่เหลือ</span></div>
+  </div>
+</div>
+
+<div class="copy-hint" id="copyHint">
+  <div class="copy-hint-header">
+    <strong>ข้อความสำหรับ Messenger</strong>
+    <button class="btn-copy" onclick="copyMessage()">คัดลอก</button>
+  </div>
+  <span id="copyText"></span>
+</div>
+
+<!-- Slip upload -->
+<p class="section-title">อัปโหลด Slip (AI อ่านยอดให้)</p>
+<div class="slip-zone" id="slipZone">
+  <input type="file" accept="image/*" id="slipInput" onchange="handleSlipFile(this.files[0])">
+  <div class="slip-zone-icon">📄</div>
+  <div class="slip-zone-text">แตะเพื่อเลือก slip<br><strong>AI จะอ่านยอดเงินให้อัตโนมัติ</strong></div>
+</div>
+<div class="slip-preview" id="slipPreview">
+  <img id="slipImg" src="" alt="slip preview">
+  <button class="slip-preview-remove" onclick="clearSlip()">✕ ลบ</button>
+</div>
+<div class="ai-reading" id="aiReading">
+  <div class="spinner"></div>
+  <span>AI กำลังอ่าน slip...</span>
+</div>
+
+<hr class="divider">
+
+<!-- Manual entry -->
+<p class="section-title">บันทึกการจ่าย</p>
+<div class="input-row">
+  <div class="input-wrap">
+    <input type="number" id="amountInput" placeholder="6,000" value="">
+    <span class="input-suffix">฿</span>
+  </div>
+  <button class="btn-pay" onclick="addPayment()">+ บันทึก</button>
+</div>
+
+<div class="month-row">
+  <select id="monthSelect"></select>
+  <select id="yearSelect"></select>
+</div>
+
+<div class="quick-row">
+  <button class="btn-quick" onclick="setAmount(3000)">3,000</button>
+  <button class="btn-quick" onclick="setAmount(6000)">6,000</button>
+  <button class="btn-quick" onclick="setAmount(10000)">10,000</button>
+  <button class="btn-quick" onclick="setAmount(12000)">12,000</button>
+</div>
+
+<div class="history-header">
+  <p class="section-title" style="margin-bottom:0">ประวัติการจ่าย</p>
+  <button class="btn-clear" onclick="clearAll()">ล้างทั้งหมด</button>
+</div>
+<div class="history-list" id="historyList"></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const TOTAL_DEBT = 200000;
+  const MONTHLY = 6000;
+  const KEY = 'debt_tracker_v2';
+
+  const MONTHS_TH = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
+                     'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+
+  // Init month/year selects
+  (function() {
+    const now = new Date();
+    const ms = document.getElementById('monthSelect');
+    MONTHS_TH.forEach((m, i) => {
+      const o = document.createElement('option');
+      o.value = i + 1; o.textContent = m;
+      if (i === now.getMonth()) o.selected = true;
+      ms.appendChild(o);
+    });
+    const ys = document.getElementById('yearSelect');
+    for (let y = now.getFullYear(); y >= now.getFullYear() - 4; y--) {
+      const o = document.createElement('option');
+      o.value = y; o.textContent = 'ปี ' + (y + 543);
+      ys.appendChild(o);
+    }
+  })();
+
+  // Drag & drop
+  const zone = document.getElementById('slipZone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f && f.type.startsWith('image/')) handleSlipFile(f);
+  });
+
+  let slipBase64 = null;
+
+  function handleSlipFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const dataUrl = e.target.result;
+      slipBase64 = dataUrl.split(',')[1];
+      document.getElementById('slipImg').src = dataUrl;
+      document.getElementById('slipPreview').style.display = 'block';
+      document.getElementById('slipZone').style.display = 'none';
+      readSlipWithAI(slipBase64);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearSlip() {
+    slipBase64 = null;
+    document.getElementById('slipPreview').style.display = 'none';
+    document.getElementById('slipZone').style.display = 'block';
+    document.getElementById('slipInput').value = '';
+    document.getElementById('aiReading').style.display = 'none';
+  }
+
+  async function readSlipWithAI(base64) {
+    document.getElementById('aiReading').style.display = 'flex';
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 128,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
+              { type: 'text', text: 'นี่คือ slip การโอนเงิน กรุณาหายอดเงินที่โอน ตอบเฉพาะตัวเลขเท่านั้น ไม่ต้องมีหน่วยหรือข้อความอื่น เช่น 6000 หรือ 6000.00 ถ้าหาไม่พบให้ตอบ 0' }
+            ]
+          }]
+        })
+      });
+      const data = await res.json();
+      const raw = data.content?.[0]?.text?.trim() || '0';
+      const amount = parseFloat(raw.replace(/,/g, '')) || 0;
+      if (amount > 0) {
+        document.getElementById('amountInput').value = amount;
+        showToast('AI อ่านได้ ' + fmt(amount) + ' บาท ✓');
+      } else {
+        showToast('AI อ่านยอดไม่ได้ — กรุณากรอกเอง');
+      }
+    } catch {
+      showToast('เกิดข้อผิดพลาด — กรุณากรอกยอดเอง');
+    }
+    document.getElementById('aiReading').style.display = 'none';
+  }
+
+  function loadData() {
+    try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; }
+  }
+  function saveData(p) { localStorage.setItem(KEY, JSON.stringify(p)); }
+  function fmt(n) { return n.toLocaleString('th-TH'); }
+  function setAmount(val) { document.getElementById('amountInput').value = val; }
+
+  function getMonthYear() {
+    const m = parseInt(document.getElementById('monthSelect').value);
+    const y = parseInt(document.getElementById('yearSelect').value);
+    return { month: m, year: y, label: MONTHS_TH[m-1] + ' ' + (y + 543) };
+  }
+
+  function addPayment() {
+    const input = document.getElementById('amountInput');
+    const amount = parseFloat(input.value);
+    if (!amount || amount <= 0) { showToast('กรุณากรอกจำนวนเงิน'); return; }
+    const payments = loadData();
+    const paid = payments.reduce((s, p) => s + p.amount, 0);
+    if (paid >= TOTAL_DEBT) { showToast('ชำระครบแล้วครับ!'); return; }
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+    const my = getMonthYear();
+    payments.unshift({ id: Date.now(), amount, date: dateStr, ts: now.getTime(), month: my.month, year: my.year, monthLabel: my.label });
+    saveData(payments);
+    input.value = '';
+    clearSlip();
+    render();
+    showCopyHint(payments);
+    showToast('บันทึก ' + fmt(amount) + ' บาทแล้ว');
+  }
+
+  function deletePayment(id) {
+    if (!confirm('ลบรายการนี้?')) return;
+    const payments = loadData().filter(p => p.id !== id);
+    saveData(payments);
+    render();
+    if (payments.length > 0) showCopyHint(payments);
+    else document.getElementById('copyHint').style.display = 'none';
+    showToast('ลบรายการแล้ว');
+  }
+
+  function showCopyHint(payments) {
+    const paid = payments.reduce((s, p) => s + p.amount, 0);
+    const remaining = Math.max(0, TOTAL_DEBT - paid);
+    const last = payments[0];
+    const my = last.monthLabel ? ' (' + last.monthLabel + ')' : '';
+    const text = 'โอนชำระหนี้ ' + fmt(last.amount) + ' บาท' + my + '\nยอดสะสม: ' + fmt(paid) + ' / ' + fmt(TOTAL_DEBT) + ' บาท\nคงเหลือ: ' + fmt(remaining) + ' บาท';
+    document.getElementById('copyText').textContent = text;
+    document.getElementById('copyHint').style.display = 'block';
+  }
+
+  function copyMessage() {
+    const text = document.getElementById('copyText').textContent;
+    navigator.clipboard.writeText(text).then(() => showToast('คัดลอกแล้ว!')).catch(() => showToast('คัดลอกไม่ได้'));
+  }
+
+  function clearAll() {
+    if (!confirm('ล้างประวัติทั้งหมด?')) return;
+    saveData([]);
+    document.getElementById('copyHint').style.display = 'none';
+    render();
+    showToast('ล้างข้อมูลแล้ว');
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2400);
+  }
+
+  function render() {
+    const payments = loadData();
+    const paid = payments.reduce((s, p) => s + p.amount, 0);
+    const remaining = Math.max(0, TOTAL_DEBT - paid);
+    const pct = Math.min(100, (paid / TOTAL_DEBT) * 100);
+    const monthsLeft = remaining > 0 ? Math.ceil(remaining / MONTHLY) : 0;
+
+    document.getElementById('paidDisplay').textContent = fmt(paid);
+    document.getElementById('progressBar').style.width = pct + '%';
+    document.getElementById('statPercent').textContent = pct.toFixed(1) + '%';
+    document.getElementById('statRemaining').textContent = fmt(remaining);
+    document.getElementById('statMonths').textContent = monthsLeft > 0 ? monthsLeft : '✓';
+    document.getElementById('completeBanner').style.display = paid >= TOTAL_DEBT ? 'block' : 'none';
+
+    const list = document.getElementById('historyList');
+    if (payments.length === 0) {
+      list.innerHTML = '<div class="empty-state">ยังไม่มีประวัติการจ่าย<br>บันทึกรายการแรกได้เลยครับ</div>';
+      return;
+    }
+
+    const reversed = [...payments].reverse();
+    let running = 0;
+    const runningTotals = reversed.map(p => { running += p.amount; return running; });
+    runningTotals.reverse();
+
+    list.innerHTML = payments.map((p, i) => {
+      const cumPaid = runningTotals[i];
+      const rem = Math.max(0, TOTAL_DEBT - cumPaid);
+      const badge = p.monthLabel ? '<span class="history-month-badge">📅 ' + p.monthLabel + '</span>' : '';
+      return '<div class="history-item">' +
+        '<div class="history-left">' +
+          '<span class="history-index">' + String(payments.length - i).padStart(2,'0') + '</span>' +
+          '<div class="history-info">' +
+            '<span class="history-amount">+' + fmt(p.amount) + ' ฿</span>' +
+            '<span class="history-date">' + p.date + '</span>' +
+            badge +
+          '</div>' +
+        '</div>' +
+        '<div class="history-right">' +
+          '<div class="history-running">' + fmt(cumPaid) + ' / ' + fmt(TOTAL_DEBT) + '</div>' +
+          '<div class="history-remaining">เหลือ ' + fmt(rem) + ' ฿</div>' +
+        '</div>' +
+        '<button class="btn-delete" onclick="deletePayment(' + p.id + ')" title="ลบรายการ">✕</button>' +
+      '</div>';
+    }).join('');
+  }
+
+  render();
+</script>
+</body>
+</html>
